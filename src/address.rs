@@ -292,6 +292,12 @@ mod tests {
             .unwrap()
             .to_string();
         assert_eq!(fast_p2sh, safe_p2sh, "fast P2SH mismatch");
+
+        // Native SegWit (P2WPKH) – always compressed
+        let fast_segwit = native_segwit_address_fast(&pk_compressed);
+        let compressed_pk = CompressedPublicKey::try_from(pubkey_c).unwrap();
+        let safe_segwit = Address::p2wpkh(&compressed_pk, Network::Bitcoin).to_string();
+        assert_eq!(fast_segwit, safe_segwit, "fast SegWit mismatch");
     }
 
     /// Test hash160 with known vectors.

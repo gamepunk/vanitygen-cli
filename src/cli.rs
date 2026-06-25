@@ -283,6 +283,7 @@ pub fn validate_prefix(
             }
         }
     }
+
     // For SegWit / Taproot, every character must be a valid Bech32 character.
     // When case_insensitive is true, we accept uppercase letters too (they
     // will be lowercased during matching).
@@ -293,16 +294,19 @@ pub fn validate_prefix(
             Cow::Borrowed(body)
         };
         for c in check.chars() {
-            let valid = c.is_ascii_lowercase() || c.is_ascii_digit();
-            if !valid {
+            if !BECH32_CHARS.contains(c) {
                 return Err(format!(
-                    "Bech32(m) addresses only allow lowercase letters and digits; got '{c}'."
+                    "Character '{c}' is not in the Bech32 alphabet ('qpzry9x8gf2tvdw0s3jn54khce6mua7l')."
                 ));
             }
         }
     }
     Ok(())
 }
+
+/// Bech32 character set (BIP-173).
+/// Not all ASCII lowercase letters are valid — 'b', 'i', 'o' etc. are excluded.
+const BECH32_CHARS: &str = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
 /// Capitalise the second character of a prefix (e.g., "3qq" → "3Qq").
 fn make_second_upper(s: &str) -> String {
@@ -376,25 +380,34 @@ mod tests {
 
     #[test]
     fn test_validate_segwit_prefix() {
-        assert!(validate_prefix("bc1qbit", AddressType::Segwit, true, false).is_ok());
-        assert!(validate_prefix("bc1qabc", AddressType::Segwit, true, false).is_ok());
+        assert!(validate_prefix("bc1qpxz", AddressType::Segwit, true, false).is_ok());
+        assert!(validate_prefix("bc1q9x8", AddressType::Segwit, true, false).is_ok());
         // Without case_insensitive, uppercase in Bech32 body is rejected
         assert!(validate_prefix("bc1Qbit", AddressType::Segwit, true, false).is_err());
         // With case_insensitive, uppercase is accepted (will be lowercased)
-        assert!(validate_prefix("vanity", AddressType::Segwit, true, false).is_ok());
-        assert!(validate_prefix("Vanity", AddressType::Segwit, true, true).is_ok());
-        // Non-Bech32 characters should still fail
+        assert!(validate_prefix("vanetz", AddressType::Segwit, true, false).is_ok());
+        assert!(validate_prefix("VANETZ", AddressType::Segwit, true, true).is_ok());
+        // 'i', 'b', 'o' are not valid Bech32 characters
+        assert!(validate_prefix("vanity", AddressType::Segwit, true, false).is_err());
+        assert!(validate_prefix("Vanity", AddressType::Segwit, true, true).is_err());
+        assert!(validate_prefix("bitcoi", AddressType::Segwit, true, false).is_err());
+        // Non-Bech32 characters should also fail
         assert!(validate_prefix("bc1qbit!", AddressType::Segwit, true, false).is_err());
         assert!(validate_prefix("bc1q bit", AddressType::Segwit, true, false).is_err());
     }
 
     #[test]
     fn test_validate_taproot_prefix() {
-        assert!(validate_prefix("bc1pbit", AddressType::Taproot, true, false).is_ok());
-        // Without case_insensitive, "1Bit" contains uppercase → rejected
-        assert!(validate_prefix("1Bit", AddressType::Taproot, true, false).is_err());
+        assert!(validate_prefix("bc1p9x8g", AddressType::Taproot, true, false).is_ok());
+        // Without case_insensitive, uppercase is rejected
+        assert!(validate_prefix("bc1P9X8G", AddressType::Taproot, true, false).is_err());
         // With case_insensitive, uppercase is accepted
-        assert!(validate_prefix("1Bit", AddressType::Taproot, true, true).is_ok());
+        assert!(validate_prefix("3PXZ", AddressType::Taproot, true, true).is_ok());
+        // 'i', 'b', 'o' are not valid Bech32 characters
+        assert!(validate_prefix("vanity", AddressType::Taproot, true, true).is_err());
+        assert!(validate_prefix("bitcoi", AddressType::Taproot, true, false).is_err());
+        // '1' is the bech32 separator, not a data character
+        assert!(validate_prefix("1PXZ", AddressType::Taproot, true, true).is_err());
         // Non-Bech32 characters should still fail
         assert!(validate_prefix("bc1pbit!", AddressType::Taproot, true, false).is_err());
         assert!(validate_prefix("bc1p bit", AddressType::Taproot, true, false).is_err());
