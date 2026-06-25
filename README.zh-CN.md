@@ -1,6 +1,7 @@
 # vanity
 
 [![CI](https://github.com/gamepunk/vanity/actions/workflows/ci.yml/badge.svg)](https://github.com/gamepunk/vanity/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/badge/crates.io-v0.2.0-orange)](https://crates.io/crates/vanity)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 [English](README.md)

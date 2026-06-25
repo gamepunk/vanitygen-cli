@@ -66,10 +66,15 @@ jobs:
         with:
           target: ${{ matrix.target }}
       - run: cargo build --release --target ${{ matrix.target }}
+      - name: Prepare binary
+        shell: bash
+        run: |
+          BIN="target/${{ matrix.target }}/release/vanity${{ runner.os == 'Windows' && '.exe' || '' }}"
+          cp "$BIN" "${{ matrix.name }}"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: target/${{ matrix.target }}/release/vanity*
+          path: ${{ matrix.name }}
 
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')
