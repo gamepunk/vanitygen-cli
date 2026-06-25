@@ -42,7 +42,8 @@ pub enum CliCommand {
     #[command(aliases = ["s"])]
     Search {
         /// Address prefix to search for, e.g. "1Bit", "bc1qninja".
-        prefix: String,
+        #[arg(required_unless_present = "input_file")]
+        prefix: Option<String>,
 
         /// Address type: legacy | p2sh | segwit | taproot.
         #[arg(long, short = 't', value_parser = parse_address_type, default_value = "legacy")]
@@ -64,6 +65,22 @@ pub enum CliCommand {
         #[arg(long, short = 'T', default_value_t = { std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4) })]
         threads: usize,
 
+        /// Match pattern as prefix (default).
+        #[arg(long, short = 'p', conflicts_with_all = ["suffix", "anywhere", "regex"])]
+        match_prefix: bool,
+
+        /// Match pattern as suffix.
+        #[arg(long, short = 's', conflicts_with_all = ["match_prefix", "anywhere", "regex"])]
+        suffix: bool,
+
+        /// Match pattern anywhere in the address.
+        #[arg(long, short = 'a', conflicts_with_all = ["match_prefix", "suffix", "regex"])]
+        anywhere: bool,
+
+        /// Match address using a regular expression.
+        #[arg(long, short = 'r', conflicts_with_all = ["match_prefix", "suffix", "anywhere"])]
+        regex: bool,
+
         /// Quiet mode: suppress progress output, only print final result.
         #[arg(long, short = 'q')]
         quiet: bool,
@@ -71,6 +88,14 @@ pub enum CliCommand {
         /// Bark API key for iOS push notification (or set VANITY_BARK_KEY env).
         #[arg(long)]
         bark: Option<String>,
+
+        /// Input file with patterns (one per line). Overrides positional PREFIX.
+        #[arg(long)]
+        input_file: Option<String>,
+
+        /// Output file to write results (appended).
+        #[arg(long, short = 'o')]
+        output_file: Option<String>,
     },
 
     /// Parse a WIF private key and display its derived addresses.
@@ -104,7 +129,22 @@ pub enum AddressType {
     Segwit,  // Native SegWit P2WPKH → bc1q…
     Taproot, // P2TR → bc1p…
 }
+/// How to match the pattern against the address.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatchMode {
+    Prefix,
+    Suffix,
+    Anywhere,
+    Regex,
+}
 
+/// Resolve match mode from CLI flags (default: Prefix).
+pub fn resolve_match_mode(_match_prefix: bool, suffix: bool, anywhere: bool, regex: bool) -> MatchMode {
+    if suffix { MatchMode::Suffix }
+    else if anywhere { MatchMode::Anywhere }
+    else if regex { MatchMode::Regex }
+    else { MatchMode::Prefix }
+}
 fn parse_address_type(s: &str) -> Result<AddressType, String> {
     match s.to_lowercase().as_str() {
         "legacy" | "p2pkh" => Ok(AddressType::Legacy),
@@ -122,7 +162,7 @@ impl AddressType {
     pub fn label(self) -> &'static str {
         match self {
             AddressType::Legacy => "Legacy (P2PKH)",
-            AddressType::P2sh => "P2SH-SegWit",
+            AddressType::P2sh => "Nested SegWit (P2SH)",
             AddressType::Segwit => "Native SegWit (P2WPKH)",
             AddressType::Taproot => "Taproot (P2TR)",
         }

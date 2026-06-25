@@ -24,9 +24,9 @@ use crate::wif;
 /// Standard BIP44 derivation paths for each address type.
 const DERIVATION_PATHS: &[(&str, &str)] = &[
     ("m/44'/0'/0'/0/0", "Legacy (P2PKH)"),
-    ("m/49'/0'/0'/0/0", "P2SH-SegWit"),
-    ("m/84'/0'/0'/0/0", "Native SegWit"),
-    ("m/86'/0'/0'/0/0", "Taproot"),
+    ("m/49'/0'/0'/0/0", "Nested SegWit (P2SH)"),
+    ("m/84'/0'/0'/0/0", "Native SegWit (P2WPKH)"),
+    ("m/86'/0'/0'/0/0", "Taproot (P2TR)"),
 ];
 
 /// Result of a mnemonic generation.

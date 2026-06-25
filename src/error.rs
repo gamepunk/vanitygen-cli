@@ -19,6 +19,8 @@ pub enum Error {
     Bip32(bitcoin::bip32::Error),
     /// Wrapper for I/O errors.
     Io(std::io::Error),
+    /// General error with a message.
+    Other(String),
 }
 
 impl fmt::Display for Error {
@@ -31,6 +33,7 @@ impl fmt::Display for Error {
             Error::Secp256k1(e) => write!(f, "secp256k1: {e}"),
             Error::Bip32(e) => write!(f, "BIP32: {e}"),
             Error::Io(e) => write!(f, "I/O: {e}"),
+            Error::Other(msg) => write!(f, "{msg}"),
         }
     }
 }

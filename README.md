@@ -92,10 +92,10 @@ $ vanitygen 1Pizza -T 8
   elapsed: 11.2s
 
 >> Same-key addresses
-  P2PKH: 1Pizza5RqXnupPvn9KbK8cLTBPcVB8zFhE
-  P2SH: 3Ji9hUqTq15rQd...
-  P2WPKH: bc1qpy7y0...
-  P2TR: bc1pxv50f...
+  Legacy (P2PKH): 1Pizza5RqXnupPvn9KbK8cLTBPcVB8zFhE
+  Nested SegWit (P2SH): 3Ji9hUqTq15rQd...
+  Native SegWit (P2WPKH): bc1qpy7y0...
+  Taproot (P2TR): bc1pxv50f...
 ```
 
 Search with mnemonic (slower, outputs 24-word seed phrase):
@@ -117,10 +117,10 @@ $ vanitygen 1Pizza -m
   derivation path: m/44'/0'/0'/0/0
 
 >> Wallet addresses (index 0)
-  P2PKH: 1Pizza5RqXnupPvn9KbK8cLTBPcVB8zFhE  (path: m/44'/0'/0'/0/0)
-  P2SH: 3Ji9hUqTq15rQd...                      (path: m/49'/0'/0'/0/0)
-  P2WPKH: bc1qpy7y0...                          (path: m/84'/0'/0'/0/0)
-  P2TR: bc1pxv50f...                             (path: m/86'/0'/0'/0/0)
+  Legacy (P2PKH): 1Pizza5RqXnupPvn9KbK8cLTBPcVB8zFhE  (path: m/44'/0'/0'/0/0)
+  Nested SegWit (P2SH): 3Ji9hUqTq15rQd...                      (path: m/49'/0'/0'/0/0)
+  Native SegWit (P2WPKH): bc1qpy7y0...                          (path: m/84'/0'/0'/0/0)
+  Taproot (P2TR): bc1pxv50f...                             (path: m/86'/0'/0'/0/0)
 ```
 
 Search other address types:
@@ -219,9 +219,9 @@ $ vanitygen benchmark
 | Type | CLI name | Prefix | Encoding | BIP standard |
 |------|----------|--------|----------|-------------|
 | Legacy (P2PKH) | `legacy` | `1…` | Base58Check | BIP44 |
-| P2SH-SegWit | `p2sh` | `3…` | Base58Check | BIP49 |
-| Native SegWit | `segwit` | `bc1q…` | Bech32 | BIP84 |
-| Taproot | `taproot` | `bc1p…` | Bech32m | BIP86 |
+| Nested SegWit (P2SH) | `p2sh` | `3…` | Base58Check | BIP49 |
+| Native SegWit (P2WPKH) | `segwit` | `bc1q…` | Bech32 | BIP84 |
+| Taproot (P2TR) | `taproot` | `bc1p…` | Bech32m | BIP86 |
 
 ---
 
@@ -303,6 +303,28 @@ vanitygen v0.3.1
 ├── ripemd      — RIPEMD-160 hashing (hot path)
 └── sha2        — SHA-256 hashing (hot path)
 ```
+
+---
+
+## Disclaimer
+
+**⚠ Use at your own risk.**
+
+This tool generates Bitcoin private keys entirely on your local machine.
+Private keys and mnemonic phrases are displayed in plain text on your
+terminal.  Anyone with access to your screen, terminal history, or
+clipboard can steal your funds.
+
+- **Always move funds to a new address immediately** after the vanity
+  address is funded.
+- **Clear your terminal history** after generating a key
+  (`history -c` on Unix, or restart your terminal).
+- **Never** share your WIF, mnemonic phrase, or private key with anyone.
+- **Run on an offline (air-gapped) machine** for maximum security.
+- The authors assume **no liability** for any loss of funds or damages
+  arising from the use of this software.
+
+By using this software you accept these terms.
 
 ---
 

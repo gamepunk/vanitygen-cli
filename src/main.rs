@@ -34,7 +34,7 @@ use std::process;
 use bitcoin::Network;
 use clap::Parser;
 
-use cli::{validate_prefix, AddressType, Cli, CliCommand};
+use cli::{resolve_match_mode, validate_prefix, AddressType, Cli, CliCommand, MatchMode};
 use error::Error;
 
 fn main() {
@@ -62,19 +62,51 @@ fn main() {
             mnemonic,
             uncompressed,
             threads,
+            match_prefix,
+            suffix,
+            anywhere,
+            regex,
             quiet,
             bark,
-        } => run_search(
-            &cfg,
-            prefix,
-            *address_type,
-            *case_insensitive,
-            *uncompressed,
-            *mnemonic,
-            *threads,
-            *quiet,
-            bark.as_deref(),
-        ),
+            input_file,
+            output_file,
+        } => {
+            let match_mode = resolve_match_mode(*match_prefix, *suffix, *anywhere, *regex);
+            if let Some(ifile) = input_file {
+                run_search_file(
+                    &cfg,
+                    ifile,
+                    output_file.as_deref(),
+                    *address_type,
+                    *case_insensitive,
+                    *uncompressed,
+                    *mnemonic,
+                    *threads,
+                    *quiet,
+                    bark.as_deref(),
+                    match_mode,
+                )
+            } else if let Some(pat) = prefix {
+                run_search(
+                    &cfg,
+                    pat,
+                    output_file.as_deref(),
+                    *address_type,
+                    *case_insensitive,
+                    *uncompressed,
+                    *mnemonic,
+                    *threads,
+                    *quiet,
+                    bark.as_deref(),
+                    match_mode,
+                )
+            } else {
+                // Should not happen due to clap required_unless_present.
+                Err(Error::Other(
+                    "Either a pattern or --input-file is required.".into(),
+                ))
+            }
+        }
         CliCommand::Verify { wif } => verify::run(wif),
         CliCommand::Address { wif } => run_address(wif),
         CliCommand::Benchmark => benchmark::run(),
@@ -93,7 +125,8 @@ fn main() {
 #[allow(clippy::too_many_arguments)]
 fn run_search(
     cfg: &config::Config,
-    prefix: &str,
+    pattern: &str,
+    output_file: Option<&str>,
     addr_type: AddressType,
     case_insensitive: bool,
     uncompressed: bool,
@@ -101,10 +134,13 @@ fn run_search(
     threads: usize,
     quiet: bool,
     bark_key: Option<&str>,
+    match_mode: MatchMode,
 ) -> Result<(), Error> {
-    // Validate the prefix for the chosen address type.
-    if let Err(msg) = validate_prefix(prefix, addr_type) {
-        return Err(Error::InvalidPrefix(msg));
+    // Validate the pattern for the chosen address type (only for Prefix mode).
+    if match_mode == MatchMode::Prefix {
+        if let Err(msg) = validate_prefix(pattern, addr_type) {
+            return Err(Error::InvalidPrefix(msg));
+        }
     }
 
     let network = Network::Bitcoin;
@@ -121,16 +157,16 @@ fn run_search(
         checkpoint::print_and_confirm(cp);
     }
     log::info(&format!(
-        "开始搜索: prefix={prefix}, type={}, case_insensitive={case_insensitive}, threads={threads}",
+        "开始搜索: pattern={pattern}, mode={:?}, type={}, case_insensitive={case_insensitive}, threads={threads}",
+        match_mode,
         addr_type.label(),
     ));
 
     // ── Search info ─────────────────────────────────────────────────
-    let _prefix_body = &prefix[addr_type.prefix_hint().len()..];
-
     if !quiet {
         style::header("Searching");
-        style::kv("prefix", prefix);
+        style::kv("pattern", pattern);
+        style::kv("mode", &format!("{:?}", match_mode));
         style::kv("type", addr_type.label());
         style::kv("threads", &threads.to_string());
         if use_bip32 {
@@ -141,7 +177,7 @@ fn run_search(
 
     // ── Search ──────────────────────────────────────────────────────
     let (found, elapsed) = search::search(
-        prefix,
+        pattern,
         addr_type,
         case_insensitive,
         compressed,
@@ -149,13 +185,14 @@ fn run_search(
         threads,
         use_bip32,
         quiet,
+        match_mode,
     )?;
 
     // ── Clear checkpoint + write log ───────────────────────────────
     checkpoint::clear();
     log::info(&format!(
-        "找到! prefix={}, address={}, attempts={}, elapsed={:.2}s",
-        prefix,
+        "找到! pattern={}, address={}, attempts={}, elapsed={:.2}s",
+        pattern,
         found.address,
         found.total_attempts,
         elapsed.as_secs_f64(),
@@ -211,15 +248,138 @@ fn run_search(
         let all_addrs =
             address::derive_all(&secp, &info.private_key.inner, info.compressed, network)?;
         style::header("Same-key addresses");
-        style::result_line("P2PKH", &all_addrs.legacy.to_string());
-        style::result_line("P2SH", &all_addrs.p2sh_segwit.to_string());
-        style::result_line("P2WPKH", &all_addrs.native_segwit.to_string());
-        style::result_line("P2TR", &all_addrs.taproot.to_string());
+        style::result_line("Legacy (P2PKH)", &all_addrs.legacy.to_string());
+        style::result_line("Nested SegWit (P2SH)", &all_addrs.p2sh_segwit.to_string());
+        style::result_line("Native SegWit (P2WPKH)", &all_addrs.native_segwit.to_string());
+        style::result_line("Taproot (P2TR)", &all_addrs.taproot.to_string());
     }
 
     println!();
     style::warning("Move funds immediately. Clear terminal history.");
 
+    // ── Write to output file if requested ──────────────────────────
+    if let Some(path) = output_file {
+        append_result(path, pattern, &found, elapsed, match_mode)?;
+        if !quiet {
+            println!();
+            style::success(&format!("Result appended to {}", path));
+        }
+    }
+
+    Ok(())
+}
+
+/// Process patterns from an input file (one per line).
+#[allow(clippy::too_many_arguments)]
+fn run_search_file(
+    cfg: &config::Config,
+    input_file: &str,
+    output_file: Option<&str>,
+    addr_type: AddressType,
+    case_insensitive: bool,
+    uncompressed: bool,
+    use_bip32: bool,
+    threads: usize,
+    quiet: bool,
+    bark_key: Option<&str>,
+    match_mode: MatchMode,
+) -> Result<(), Error> {
+    use std::fs;
+    use std::io::{BufRead, BufReader};
+
+    let file = fs::File::open(input_file)
+        .map_err(|e| Error::Other(format!("Cannot open input file '{}': {e}", input_file)))?;
+    let reader = BufReader::new(file);
+    let patterns: Vec<String> = reader
+        .lines()
+        .map_while(Result::ok)
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
+
+    if patterns.is_empty() {
+        return Err(Error::Other(format!(
+            "No patterns found in input file '{}'",
+            input_file
+        )));
+    }
+
+    if !quiet {
+        style::header("Batch search");
+        style::kv("patterns", &patterns.len().to_string());
+        style::kv("mode", &format!("{:?}", match_mode));
+        style::kv("type", addr_type.label());
+        style::kv("threads", &threads.to_string());
+        eprintln!();
+    }
+
+    let total = patterns.len();
+    for (i, pat) in patterns.iter().enumerate() {
+        if !quiet {
+            println!();
+            style::header(&format!("[{}/{}] Searching for: {}", i + 1, total, pat));
+        }
+
+        match run_search(
+            cfg,
+            pat,
+            output_file,
+            addr_type,
+            case_insensitive,
+            uncompressed,
+            use_bip32,
+            threads,
+            quiet,
+            bark_key,
+            match_mode,
+        ) {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("  错误 (skipping): {e}");
+                log::info(&format!("Skipping pattern '{pat}': {e}"));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Append a search result to a file in a structured format.
+fn append_result(
+    path: &str,
+    pattern: &str,
+    found: &search::FoundResult,
+    elapsed: std::time::Duration,
+    match_mode: MatchMode,
+) -> Result<(), Error> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|e| Error::Other(format!("Cannot open output file '{}': {e}", path)))?;
+
+    writeln!(
+        file,
+        "---\npattern: {pattern}\nmode: {:?}\naddress: {}\nwif: {}\nattempts: {}\nelapsed: {:.2}s",
+        match_mode,
+        found.address,
+        found.wif,
+        found.total_attempts,
+        elapsed.as_secs_f64(),
+    )
+    .map_err(|e| Error::Other(format!("Cannot write to output file '{}': {e}", path)))?;
+
+    if let Some(ref phrase) = found.mnemonic_phrase {
+        writeln!(file, "mnemonic: {phrase}")?;
+    }
+    if let Some(ref path) = found.derivation_path {
+        writeln!(file, "derivation_path: {path}")?;
+    }
+
+    writeln!(file)?;
     Ok(())
 }
 
@@ -237,9 +397,9 @@ fn derive_wallet_addresses(phrase: &str, index: u32, network: Network) -> Result
 
     // BIP44 / BIP49 / BIP84 / BIP86 at the given index.
     let configs = [
-        (44, "传统 Legacy (P2PKH)"),
-        (49, "嵌套 SegWit (P2SH-P2WPKH)"),
-        (84, "原生 SegWit (P2WPKH)"),
+        (44, "Legacy (P2PKH)"),
+        (49, "Nested SegWit (P2SH-P2WPKH)"),
+        (84, "Native SegWit (P2WPKH)"),
         (86, "Taproot (P2TR)"),
     ];
 
@@ -293,10 +453,10 @@ fn run_address(wif_str: &str) -> Result<(), Error> {
     style::kv("compressed", &info.compressed.to_string());
     println!();
     style::header("Derived addresses");
-    style::result_line("P2PKH", &set.legacy.to_string());
-    style::result_line("P2SH", &set.p2sh_segwit.to_string());
-    style::result_line("P2WPKH", &set.native_segwit.to_string());
-    style::result_line("P2TR", &set.taproot.to_string());
+    style::result_line("Legacy (P2PKH)", &set.legacy.to_string());
+    style::result_line("Nested SegWit (P2SH)", &set.p2sh_segwit.to_string());
+    style::result_line("Native SegWit (P2WPKH)", &set.native_segwit.to_string());
+    style::result_line("Taproot (P2TR)", &set.taproot.to_string());
     println!();
 
     Ok(())

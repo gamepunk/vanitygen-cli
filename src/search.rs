@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use bip39::Mnemonic;
+use regex::Regex;
 use bitcoin::{
     bip32::{DerivationPath, Xpriv},
     secp256k1::{Scalar, Secp256k1, SecretKey},
@@ -22,7 +23,7 @@ use rand::RngCore;
 
 use crate::address::{self as addr, derive_single};
 use crate::checkpoint;
-use crate::cli::AddressType;
+use crate::cli::{AddressType, MatchMode};
 use crate::error::Error;
 use crate::style;
 use crate::wif;
@@ -45,11 +46,43 @@ pub struct FoundResult {
 }
 
 // -----------------------------------------------------------------------
+// Matching helper
+// -----------------------------------------------------------------------
+
+/// Check whether `addr` matches `pattern` according to `mode`.
+/// For Regex mode, `re` is a pre-compiled `Regex`; pass `None` otherwise.
+pub fn is_match(
+    addr: &str,
+    pattern: &str,
+    mode: MatchMode,
+    case_insensitive: bool,
+    re: Option<&Regex>,
+) -> bool {
+    let s = if case_insensitive {
+        addr.to_lowercase()
+    } else {
+        addr.to_string()
+    };
+    match mode {
+        MatchMode::Prefix => s.starts_with(pattern),
+        MatchMode::Suffix => s.ends_with(pattern),
+        MatchMode::Anywhere => s.contains(pattern),
+        MatchMode::Regex => {
+            if let Some(r) = re {
+                r.is_match(addr)
+            } else {
+                false
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------
 // Public dispatcher
 // -----------------------------------------------------------------------
 
-/// Launch `num_threads` workers to search for an address whose string
-/// representation starts with `prefix`.
+/// Launch `num_threads` workers to search for an address matching
+/// `pattern` according to `match_mode`.
 ///
 /// When `use_bip32` is true the workers walk through BIP32 address indices
 /// (each worker generates its own random BIP39 mnemonic), producing a
@@ -59,7 +92,7 @@ pub struct FoundResult {
 /// This function **blocks** until a match is found.
 #[allow(clippy::too_many_arguments)]
 pub fn search(
-    prefix: &str,
+    pattern: &str,
     addr_type: AddressType,
     case_insensitive: bool,
     compressed: bool,
@@ -67,26 +100,40 @@ pub fn search(
     num_threads: usize,
     use_bip32: bool,
     quiet: bool,
+    match_mode: MatchMode,
 ) -> Result<(FoundResult, std::time::Duration), Error> {
-    let prefix = Arc::new(prefix.to_string());
+    let pattern = Arc::new(pattern.to_string());
+    let match_mode = Arc::new(match_mode);
     let found = Arc::new(AtomicBool::new(false));
     let counter = Arc::new(AtomicU64::new(0));
     let result: Arc<Mutex<Option<FoundResult>>> = Arc::new(Mutex::new(None));
 
-    // Pre-compute the comparison string.
-    let prefix_cmp = if case_insensitive {
-        prefix.to_lowercase()
-    } else {
-        prefix.to_string()
+    // Pre-compile regex if needed.
+    let re: Option<Regex> = match *match_mode {
+        MatchMode::Regex => Some(Regex::new(&pattern).map_err(|e| {
+            Error::Other(format!("Invalid regex pattern: {e}"))
+        })?),
+        _ => None,
     };
+    let re = Arc::new(re);
+
+    // Pre-compute the comparison string for non-regex modes.
+    let cmp_pat = if case_insensitive {
+        pattern.to_lowercase()
+    } else {
+        pattern.to_string()
+    };
+    let cmp_pat = Arc::new(cmp_pat);
 
     let start = Instant::now();
 
     // ── Spawn workers ───────────────────────────────────────────────
     let mut handles = Vec::with_capacity(num_threads);
     for _ in 0..num_threads {
-        let prefix = Arc::clone(&prefix);
-        let prefix_cmp = prefix_cmp.clone();
+        let pattern = Arc::clone(&pattern);
+        let cmp_pat = Arc::clone(&cmp_pat);
+        let re = Arc::clone(&re);
+        let match_mode = Arc::clone(&match_mode);
         let found = Arc::clone(&found);
         let counter = Arc::clone(&counter);
         let result = Arc::clone(&result);
@@ -94,8 +141,10 @@ pub fn search(
         if use_bip32 {
             handles.push(std::thread::spawn(move || {
                 worker_bip32(
-                    &prefix,
-                    &prefix_cmp,
+                    &pattern,
+                    &cmp_pat,
+                    &re,
+                    match_mode,
                     addr_type,
                     case_insensitive,
                     network,
@@ -107,8 +156,10 @@ pub fn search(
         } else {
             handles.push(std::thread::spawn(move || {
                 worker(
-                    &prefix,
-                    &prefix_cmp,
+                    &pattern,
+                    &cmp_pat,
+                    &re,
+                    match_mode,
                     addr_type,
                     case_insensitive,
                     compressed,
@@ -123,7 +174,7 @@ pub fn search(
 
     // ── Progress reporter (main thread) ─────────────────────────────
     let checkpoint_params = checkpoint::SearchParams {
-        prefix: prefix.to_string(),
+        prefix: pattern.to_string(),
         address_type: addr_type,
         case_insensitive,
         threads: num_threads,
@@ -177,8 +228,10 @@ pub fn search(
 
 #[allow(clippy::too_many_arguments)]
 fn worker(
-    _prefix: &str,
-    prefix_cmp: &str,
+    _pattern: &str,
+    cmp_pat: &str,
+    re: &Option<Regex>,
+    match_mode: Arc<MatchMode>,
     addr_type: AddressType,
     case_insensitive: bool,
     compressed: bool,
@@ -234,12 +287,8 @@ fn worker(
 
             let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
 
-            // Prefix check.
-            let is_match = if case_insensitive {
-                addr_str.to_lowercase().starts_with(prefix_cmp)
-            } else {
-                addr_str.starts_with(prefix_cmp)
-            };
+            // Match check using the configured match mode.
+            let is_match = is_match(&addr_str, cmp_pat, *match_mode, case_insensitive, re.as_ref());
 
             if is_match {
                 if !found.swap(true, Ordering::SeqCst) {
@@ -280,8 +329,10 @@ fn worker(
 
 #[allow(clippy::too_many_arguments)]
 fn worker_bip32(
-    _prefix: &str,
-    prefix_cmp: &str,
+    _pattern: &str,
+    cmp_pat: &str,
+    re: &Option<Regex>,
+    match_mode: Arc<MatchMode>,
     addr_type: AddressType,
     case_insensitive: bool,
     network: Network,
@@ -335,11 +386,8 @@ fn worker_bip32(
         };
         let addr_str = addr.to_string();
 
-        let is_match = if case_insensitive {
-            addr_str.to_lowercase().starts_with(prefix_cmp)
-        } else {
-            addr_str.starts_with(prefix_cmp)
-        };
+        // Match check using the configured match mode.
+        let is_match = is_match(&addr_str, cmp_pat, *match_mode, case_insensitive, re.as_ref());
 
         let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
 

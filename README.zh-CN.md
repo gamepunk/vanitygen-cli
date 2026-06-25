@@ -101,10 +101,10 @@ $ vanitygen verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
   compressed: true
 
 >> Derived addresses
-  P2PKH: 1Ninja2TuXomkKakWbMzb9VBG8aj5krLbF
-  P2SH: 37nx7BGgtq28QbRfMAdHYg2zsjmGBiVtuQ
-  P2WPKH: bc1qaeqa7easxmtfzr2jrpaqex9t6nudj0887p8cdq
-  P2TR: bc1pm3xcsp9ys2y6f2elt0yqzycrdkssdv4xhznjudqn2r07k2ympvusdnazap
+  Legacy (P2PKH): 1Ninja2TuXomkKakWbMzb9VBG8aj5krLbF
+  Nested SegWit (P2SH): 37nx7BGgtq28QbRfMAdHYg2zsjmGBiVtuQ
+  Native SegWit (P2WPKH): bc1qaeqa7easxmtfzr2jrpaqex9t6nudj0887p8cdq
+  Taproot (P2TR): bc1pm3xcsp9ys2y6f2elt0yqzycrdkssdv4xhznjudqn2r07k2ympvusdnazap
 ```
 
 ---
@@ -139,10 +139,10 @@ $ vanitygen benchmark
 
 | 类型 | CLI 名称 | 前缀 | 编码 | BIP 标准 |
 |------|----------|------|------|----------|
-| 传统 (P2PKH) | `legacy` | `1…` | Base58Check | BIP44 |
-| 嵌套 SegWit | `p2sh` | `3…` | Base58Check | BIP49 |
-| 原生 SegWit | `segwit` | `bc1q…` | Bech32 | BIP84 |
-| Taproot | `taproot` | `bc1p…` | Bech32m | BIP86 |
+| Legacy (P2PKH) | `legacy` | `1…` | Base58Check | BIP44 |
+| Nested SegWit (P2SH) | `p2sh` | `3…` | Base58Check | BIP49 |
+| Native SegWit (P2WPKH) | `segwit` | `bc1q…` | Bech32 | BIP84 |
+| Taproot (P2TR) | `taproot` | `bc1p…` | Bech32m | BIP86 |
 
 ---
 
@@ -207,6 +207,24 @@ vanitygen v0.3.1
 ├── ripemd      — RIPEMD-160 哈希（热路径）
 └── sha2        — SHA-256 哈希（热路径）
 ```
+
+---
+
+## 免责声明
+
+**⚠ 使用风险自负。**
+
+本工具在您的本地机器上生成比特币私钥。私钥和助记词以明文形式显示在
+终端上。任何能够访问您屏幕、终端历史记录或剪贴板的人都可能窃取您的
+资金。
+
+- **资金到账后立即转走**，不要长期存放在虚荣地址中。
+- **生成密钥后清除终端历史**（Unix 下执行 `history -c`，或重启终端）。
+- **切勿**向任何人透露您的 WIF、助记词或私钥。
+- **在离线（断网）机器上运行**以获得最大安全性。
+- 作者**不承担**因使用本软件导致的任何资金损失或其他损害的责任。
+
+使用本软件即表示您接受以上条款。
 
 ---
 
