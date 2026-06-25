@@ -34,10 +34,10 @@ pub fn run(wif_str: &str) -> Result<(), Error> {
     println!();
 
     crate::style::header("Derived addresses");
-    crate::style::result_line("P2PKH", &set.legacy.to_string());
-    crate::style::result_line("P2SH", &set.p2sh_segwit.to_string());
-    crate::style::result_line("P2WPKH", &set.native_segwit.to_string());
-    crate::style::result_line("P2TR", &set.taproot.to_string());
+    crate::style::result_line("Legacy (P2PKH)", &set.legacy.to_string());
+    crate::style::result_line("Nested SegWit (P2SH)", &set.p2sh_segwit.to_string());
+    crate::style::result_line("Native SegWit (P2WPKH)", &set.native_segwit.to_string());
+    crate::style::result_line("Taproot (P2TR)", &set.taproot.to_string());
     println!();
 
     Ok(())

@@ -598,3 +598,91 @@ fn is_subcommand(s: &str) -> bool {
             | "m"
     )
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_line_flags_plain_pattern() {
+        let (pat, mode, addr, ci) =
+            parse_line_flags("1Bitcoin", MatchMode::Prefix, AddressType::Legacy, false).unwrap();
+        assert_eq!(pat, "1Bitcoin");
+        assert_eq!(mode, MatchMode::Prefix);
+        assert_eq!(addr, AddressType::Legacy);
+        assert!(!ci);
+    }
+
+    #[test]
+    fn test_parse_line_flags_suffix() {
+        let (pat, mode, addr, ci) =
+            parse_line_flags("pizza -s", MatchMode::Prefix, AddressType::Legacy, false).unwrap();
+        assert_eq!(pat, "pizza");
+        assert_eq!(mode, MatchMode::Suffix);
+        assert_eq!(addr, AddressType::Legacy);
+        assert!(!ci);
+    }
+
+    #[test]
+    fn test_parse_line_flags_anywhere_and_type() {
+        let (pat, mode, addr, ci) = parse_line_flags(
+            "ninja -a -t segwit",
+            MatchMode::Prefix,
+            AddressType::Legacy,
+            false,
+        )
+        .unwrap();
+        assert_eq!(pat, "ninja");
+        assert_eq!(mode, MatchMode::Anywhere);
+        assert_eq!(addr, AddressType::Segwit);
+        assert!(!ci);
+    }
+
+    #[test]
+    fn test_parse_line_flags_regex_insensitive() {
+        let (pat, mode, _addr, ci) = parse_line_flags(
+            "^1A.*T$ -r -i",
+            MatchMode::Prefix,
+            AddressType::Legacy,
+            false,
+        )
+        .unwrap();
+        assert_eq!(pat, "^1A.*T$");
+        assert_eq!(mode, MatchMode::Regex);
+        assert!(ci);
+    }
+
+    #[test]
+    fn test_parse_line_flags_unknown_flag() {
+        let result =
+            parse_line_flags("test --unknown", MatchMode::Prefix, AddressType::Legacy, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_line_flags_missing_type_value() {
+        let result =
+            parse_line_flags("test -t", MatchMode::Prefix, AddressType::Legacy, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_line_flags_invalid_type() {
+        let result =
+            parse_line_flags("test -t invalid", MatchMode::Prefix, AddressType::Legacy, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_is_subcommand() {
+        assert!(is_subcommand("search"));
+        assert!(is_subcommand("s"));
+        assert!(is_subcommand("verify"));
+        assert!(is_subcommand("mnemonic"));
+        assert!(!is_subcommand(""));
+        assert!(!is_subcommand("notacommand"));
+    }
+}

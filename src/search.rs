@@ -432,3 +432,65 @@ fn worker_bip32(
         // Not a match → generate a brand-new mnemonic and try again.
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use regex::Regex;
+
+    #[test]
+    fn test_is_match_prefix() {
+        assert!(is_match("1ABCDef", "1ABC", MatchMode::Prefix, false, None));
+        assert!(!is_match("1ABCDef", "1XYZ", MatchMode::Prefix, false, None));
+    }
+
+    #[test]
+    fn test_is_match_prefix_case_insensitive() {
+        // Pattern must already be lowercased when case_insensitive=true
+        // (the search() function pre-computes cmp_pat this way).
+        assert!(is_match("1ABCDef", "1abc", MatchMode::Prefix, true, None));
+        assert!(is_match("1ABCDef", "1abcd", MatchMode::Prefix, true, None));
+        assert!(!is_match("1ABCDef", "1xyz", MatchMode::Prefix, true, None));
+    }
+
+    #[test]
+    fn test_is_match_suffix() {
+        assert!(is_match("1ABCDef", "Def", MatchMode::Suffix, false, None));
+        assert!(!is_match("1ABCDef", "abc", MatchMode::Suffix, false, None));
+    }
+
+    #[test]
+    fn test_is_match_suffix_case_insensitive() {
+        assert!(is_match("1ABCDef", "def", MatchMode::Suffix, true, None));
+    }
+
+    #[test]
+    fn test_is_match_anywhere() {
+        assert!(is_match("1ABCDef", "BCD", MatchMode::Anywhere, false, None));
+        assert!(is_match("1ABCDef", "1AB", MatchMode::Anywhere, false, None));
+        assert!(is_match("1ABCDef", "Def", MatchMode::Anywhere, false, None));
+        assert!(!is_match("1ABCDef", "XYZ", MatchMode::Anywhere, false, None));
+    }
+
+    #[test]
+    fn test_is_match_regex() {
+        let re = Regex::new("^1[A-Z]{3}").unwrap();
+        assert!(is_match("1ABCDef", "", MatchMode::Regex, false, Some(&re)));
+        assert!(!is_match("1abcDef", "", MatchMode::Regex, false, Some(&re)));
+
+        let re2 = Regex::new("pizza$").unwrap();
+        assert!(is_match("bc1qpizza", "", MatchMode::Regex, false, Some(&re2)));
+        assert!(!is_match("bc1qpizzz", "", MatchMode::Regex, false, Some(&re2)));
+    }
+
+    #[test]
+    fn test_is_match_regex_with_case_insensitive() {
+        // case_insensitive should have no effect on regex mode
+        let re = Regex::new("^1[A-Z]{3}").unwrap();
+        assert!(is_match("1ABCxyz", "", MatchMode::Regex, true, Some(&re)));
+        assert!(!is_match("1abcxyz", "", MatchMode::Regex, true, Some(&re)));
+    }
+}

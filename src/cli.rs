@@ -347,4 +347,24 @@ mod tests {
         assert_eq!(make_second_upper("1"), "1"); // too short
         assert_eq!(make_second_upper(""), "");
     }
+
+    #[test]
+    fn test_word_count_to_entropy() {
+        assert_eq!(word_count_to_entropy_bytes(12).unwrap(), 16);
+        assert_eq!(word_count_to_entropy_bytes(15).unwrap(), 20);
+        assert_eq!(word_count_to_entropy_bytes(18).unwrap(), 24);
+        assert_eq!(word_count_to_entropy_bytes(21).unwrap(), 28);
+        assert_eq!(word_count_to_entropy_bytes(24).unwrap(), 32);
+        assert!(word_count_to_entropy_bytes(10).is_err());
+        assert!(word_count_to_entropy_bytes(99).is_err());
+    }
+
+    #[test]
+    fn test_resolve_match_mode() {
+        assert_eq!(resolve_match_mode(false, false, false, false), MatchMode::Prefix);
+        assert_eq!(resolve_match_mode(true, false, false, false), MatchMode::Prefix);
+        assert_eq!(resolve_match_mode(false, true, false, false), MatchMode::Suffix);
+        assert_eq!(resolve_match_mode(false, false, true, false), MatchMode::Anywhere);
+        assert_eq!(resolve_match_mode(false, false, false, true), MatchMode::Regex);
+    }
 }
