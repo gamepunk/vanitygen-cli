@@ -1,5 +1,5 @@
 [package]
-name = "vanity"
+name = "vanity-btc"
 version = "0.3.0"
 edition = "2021"
 description = "Bitcoin vanity address generator — find your perfect address"
@@ -9,6 +9,10 @@ homepage = "https://github.com/gamepunk/vanity"
 readme = "README.md"
 keywords = ["bitcoin", "vanity", "address", "crypto", "wallet"]
 categories = ["command-line-utilities", "cryptography"]
+
+[[bin]]
+name = "vanity"
+path = "src/main.rs"
 
 [dependencies]
 # ── Bitcoin primitives ───────────────────────────────────────────────
