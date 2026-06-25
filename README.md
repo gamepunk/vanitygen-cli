@@ -1,6 +1,6 @@
 # vanitygen
 
-[![CI](https://github.com/gamepunk/vanity/actions/workflows/ci.yml/badge.svg)](https://github.com/gamepunk/vanity/actions/workflows/ci.yml)
+[![CI](https://github.com/gamepunk/vanitygen/actions/workflows/ci.yml/badge.svg)](https://github.com/gamepunk/vanitygen/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/vanitygen.svg)](https://crates.io/crates/vanitygen)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
