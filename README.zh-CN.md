@@ -34,7 +34,13 @@ cargo build --release
 或全局安装：
 
 ```bash
+# 通过 crates.io 安装（推荐）：
+cargo install vanitygen
+
+# 或从源码构建：
 cargo install --git https://github.com/gamepunk/vanitygen.git
+
+# 然后运行：
 vanitygen 1Bit
 ```
 
@@ -94,6 +100,34 @@ $ vanitygen 1Pizza -T 8
   WIF: L2VH7b3xpLkv1jN8bPNdw73tK8fH...
   attempts: 10,317
   elapsed: 11.2s
+
+>> Same-key addresses
+  Legacy (P2PKH): 1Pizza5RqXnupPvn9KbK8cLTBPcVB8zFhE
+  Nested SegWit (P2SH): 3Ji9hUqTq15rQd...
+  Native SegWit (P2WPKH): bc1qpy7y0...
+  Taproot (P2TR): bc1pxv50f...
+```
+
+大小写不敏感搜索（更快，地址字母大小写随机）：
+```bash
+vanitygen 1bit -i -T 8
+```
+
+非压缩公钥（仅 Legacy 类型）：
+```bash
+vanitygen 1Pizza -u -T 8
+```
+
+BIP39 助记词模式（更慢，但输出 24 词助记词）：
+```bash
+vanitygen 1Pizza -m
+```
+
+其他地址类型：
+```bash
+vanitygen bc1qbit -t segwit
+vanitygen 3Pizza -t p2sh
+vanitygen bc1pbit -t taproot
 ```
 
 **匹配模式：**
@@ -104,11 +138,17 @@ $ vanitygen 1Pizza -T 8
 # 后缀模式 — 地址以 "pizza" 结尾
 vanitygen pizza -s -t segwit
 
+# 后缀 + 大小写不敏感
+vanitygen pizza -s -i -t segwit
+
 # 子串模式 — 地址包含 "ninja"
 vanitygen ninja -a -t segwit
 
 # 正则模式 — 支持 regex crate 的全部语法
 vanitygen '^1[A-Z]{3}.*[0-9]{2}$' -r -t legacy
+
+# 正则 + 类似后缀匹配
+vanitygen 'pizza$' -r -t segwit
 ```
 
 **批量模式（输入/输出文件）：**
@@ -159,26 +199,61 @@ $ vanitygen verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
 
 ### `vanitygen address` — 查看私钥对应的全部地址
 
+从单个私钥派生出全部 4 种地址格式。
+
 ```
-$ vanitygen address <WIF>
+$ vanitygen address Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
+>> Addresses from private key
+  network: Mainnet
+  compressed: true
+
+>> Derived addresses
+  Legacy (P2PKH): 1Ninja2TuXomkKakWbMzb9VBG8aj5krLbF
+  Nested SegWit (P2SH): 37nx7BGgtq28QbRfMAdHYg2zsjmGBiVtuQ
+  Native SegWit (P2WPKH): bc1qaeqa7easxmtfzr2jrpaqex9t6nudj0887p8cdq
+  Taproot (P2TR): bc1pm3xcsp9ys2y6f2elt0yqzycrdkssdv4xhznjudqn2r07k2ympvusdnazap
 ```
 
 ---
 
 ### `vanitygen mnemonic` — 生成随机 BIP39 钱包
 
-生成 24 词助记词 + 4 条标准 BIP32 路径的地址。
+生成 24 词 BIP39 助记词（256 位），并为全部 4 条标准 BIP32 路径派生地址。
+
+```
+$ vanitygen mnemonic
+>> BIP39 Mnemonic (24 words, 256-bit)
+  abandon ability able about above absent abstract ...
+
+>> Legacy (P2PKH)
+  path: m/44'/0'/0'/0/0
+  WIF: L25wxdxzuhRbAZ5ScDf...
+  Legacy (P2PKH): 1Htr2MgUzhxRLuzAb3HB6HxgEoBe2Cswmq
+  Nested SegWit (P2SH): 3MAJvD3BF4EvvponEDZQckPKc5TaY9oCSz
+  Native SegWit (P2WPKH): bc1qh9gzvddydxcx7w2wh28sypt7xj0xlgcy9pngc6
+  Taproot (P2TR): bc1p84pg4cl2zxda5k6lydugnh2umdsc8e5035303ss3f0pqvxmcdmqsc6r43y
+```
+
+⚠ 请手写抄下这 24 个单词，离线保存。任何人拥有此助记词即可窃取你的资金。
 
 ---
 
 ### `vanitygen benchmark` — 性能测试
 
+通过随机密钥派生全部 4 种地址类型来测量吞吐量。
+
 ```
 $ vanitygen benchmark
 >> Benchmark
   threads: 8
-  iterations: 400000
+  iterations: 400000 (50000 per thread)
+
+>> Results
+  elapsed: 3.315s
+  keys derived: 400000
   speed: 0.12 Mkeys/s
+  threads: 8
+  per thread: 15.08 kkeys/s
 ```
 
 ---
@@ -246,7 +321,7 @@ CLI 参数优先级高于配置文件。
 ## 依赖
 
 ```
-vanitygen v0.3.1
+vanitygen v0.4.0
 ├── bip39       — BIP39 助记词生成
 ├── bitcoin     — 比特币地址/密钥类型
 ├── bs58        — Base58Check 编码（热路径）

@@ -34,7 +34,13 @@ cargo build --release
 Or install globally:
 
 ```bash
+# From crates.io (recommended):
+cargo install vanitygen
+
+# Or build from source:
 cargo install --git https://github.com/gamepunk/vanitygen.git
+
+# Then run:
 vanitygen 1Bit
 ```
 
@@ -105,12 +111,17 @@ $ vanitygen 1Pizza -T 8
   Taproot (P2TR): bc1pxv50f...
 ```
 
-Search with `-i` (case-insensitive, faster):
+Search case-insensitive (faster, address letter-case will be random):
 ```
-$ vanitygen 1bit -i -T 8
+vanitygen 1bit -i -T 8
 ```
 
-Search with mnemonic (slower, outputs 24-word seed phrase):
+Search with uncompressed public key (Legacy only):
+```
+vanitygen 1Pizza -u -T 8
+```
+
+Search with mnemonic (slower, outputs BIP39 seed phrase):
 ```
 $ vanitygen 1Pizza -m
 >> Searching
@@ -151,11 +162,17 @@ Use one of these flags to change the match behaviour:
 # Suffix mode — address ends with "pizza"
 vanitygen pizza -s -t segwit
 
+# Suffix + case-insensitive
+vanitygen pizza -s -i -t segwit
+
 # Anywhere mode — address contains "ninja"
 vanitygen ninja -a -t segwit
 
 # Regex mode — any regex pattern supported by the regex crate
 vanitygen '^1[A-Z]{3}.*[0-9]{2}$' -r -t legacy
+
+# Regex + suffix-style via regex anchor
+vanitygen 'pizza$' -r -t segwit
 ```
 
 **Batch mode (input / output files):**
@@ -199,10 +216,10 @@ $ vanitygen verify Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
   compressed: true
 
 >> Derived addresses
-  P2PKH: 1Ninja2TuXomkKakWbMzb9VBG8aj5krLbF
-  P2SH: 37nx7BGgtq28QbRfMAdHYg2zsjmGBiVtuQ
-  P2WPKH: bc1qaeqa7easxmtfzr2jrpaqex9t6nudj0887p8cdq
-  P2TR: bc1pm3xcsp9ys2y6f2elt0yqzycrdkssdv4xhznjudqn2r07k2ympvusdnazap
+  Legacy (P2PKH): 1Ninja2TuXomkKakWbMzb9VBG8aj5krLbF
+  Nested SegWit (P2SH): 37nx7BGgtq28QbRfMAdHYg2zsjmGBiVtuQ
+  Native SegWit (P2WPKH): bc1qaeqa7easxmtfzr2jrpaqex9t6nudj0887p8cdq
+  Taproot (P2TR): bc1pm3xcsp9ys2y6f2elt0yqzycrdkssdv4xhznjudqn2r07k2ympvusdnazap
 ```
 
 ---
@@ -218,10 +235,10 @@ $ vanitygen address Kz6K83ge1AeeDi7fvE7kxGkyYws47sucXUZZwMXVTFG9q7u4ey12
   compressed: true
 
 >> Derived addresses
-  P2PKH: 1Ninja2TuXomkKakWbMzb9VBG8aj5krLbF
-  P2SH: 37nx7BGgtq28QbRfMAdHYg2zsjmGBiVtuQ
-  P2WPKH: bc1qaeqa7easxmtfzr2jrpaqex9t6nudj0887p8cdq
-  P2TR: bc1pm3xcsp9ys2y6f2elt0yqzycrdkssdv4xhznjudqn2r07k2ympvusdnazap
+  Legacy (P2PKH): 1Ninja2TuXomkKakWbMzb9VBG8aj5krLbF
+  Nested SegWit (P2SH): 37nx7BGgtq28QbRfMAdHYg2zsjmGBiVtuQ
+  Native SegWit (P2WPKH): bc1qaeqa7easxmtfzr2jrpaqex9t6nudj0887p8cdq
+  Taproot (P2TR): bc1pm3xcsp9ys2y6f2elt0yqzycrdkssdv4xhznjudqn2r07k2ympvusdnazap
 ```
 
 ---
@@ -350,7 +367,7 @@ CLI flags always override config file values.
 ## Dependencies
 
 ```
-vanitygen v0.3.1
+vanitygen v0.4.0
 ├── bip39       — BIP39 mnemonic generation
 ├── bitcoin     — Bitcoin address / key types
 ├── bs58        — Base58Check encoding (hot path)
