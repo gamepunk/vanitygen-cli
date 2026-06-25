@@ -6,6 +6,8 @@
 //! - **address**: derive all four address types from a WIF.
 //! - **benchmark**: measure key-generation throughput.
 
+use std::borrow::Cow;
+
 use clap::{Parser, Subcommand};
 
 /// Bitcoin vanity address generator.
@@ -229,6 +231,7 @@ pub fn validate_prefix(
     prefix: &str,
     addr_type: AddressType,
     strip_prefix: bool,
+    case_insensitive: bool,
 ) -> Result<(), String> {
     let hint = addr_type.prefix_hint();
 
@@ -281,8 +284,15 @@ pub fn validate_prefix(
         }
     }
     // For SegWit / Taproot, every character must be a valid Bech32 character.
+    // When case_insensitive is true, we accept uppercase letters too (they
+    // will be lowercased during matching).
     if addr_type == AddressType::Segwit || addr_type == AddressType::Taproot {
-        for c in body.chars() {
+        let check = if case_insensitive {
+            Cow::Owned(body.to_ascii_lowercase())
+        } else {
+            Cow::Borrowed(body)
+        };
+        for c in check.chars() {
             let valid = c.is_ascii_lowercase() || c.is_ascii_digit();
             if !valid {
                 return Err(format!(
@@ -342,42 +352,52 @@ mod tests {
 
     #[test]
     fn test_validate_legacy_prefix() {
-        assert!(validate_prefix("1Bit", AddressType::Legacy, true).is_ok());
-        assert!(validate_prefix("1Love", AddressType::Legacy, true).is_ok());
+        assert!(validate_prefix("1Bit", AddressType::Legacy, true, false).is_ok());
+        assert!(validate_prefix("1Love", AddressType::Legacy, true, false).is_ok());
         // With strip_prefix=true, "2Bit" doesn't start with "1", used as-is,
         // and is valid Base58 → OK
-        assert!(validate_prefix("2Bit", AddressType::Legacy, true).is_ok());
-        assert!(validate_prefix("3Bit", AddressType::Legacy, true).is_ok());
+        assert!(validate_prefix("2Bit", AddressType::Legacy, true, false).is_ok());
+        assert!(validate_prefix("3Bit", AddressType::Legacy, true, false).is_ok());
         // But invalid Base58 chars should still fail
-        assert!(validate_prefix("1OBit", AddressType::Legacy, true).is_err());
-        assert!(validate_prefix("1lBit", AddressType::Legacy, true).is_err());
+        assert!(validate_prefix("1OBit", AddressType::Legacy, true, false).is_err());
+        assert!(validate_prefix("1lBit", AddressType::Legacy, true, false).is_err());
     }
 
     #[test]
     fn test_validate_p2sh_prefix() {
-        assert!(validate_prefix("3Bit", AddressType::P2sh, true).is_ok());
+        assert!(validate_prefix("3Bit", AddressType::P2sh, true, false).is_ok());
         // With strip_prefix=true, "3qBit" strips "3" → "qBit" (valid Base58)
-        assert!(validate_prefix("3qBit", AddressType::P2sh, true).is_ok());
-        assert!(validate_prefix("3QBit", AddressType::P2sh, true).is_ok());
+        assert!(validate_prefix("3qBit", AddressType::P2sh, true, false).is_ok());
+        assert!(validate_prefix("3QBit", AddressType::P2sh, true, false).is_ok());
         // Invalid Base58 chars should still fail
-        assert!(validate_prefix("3OBit", AddressType::P2sh, true).is_err());
-        assert!(validate_prefix("3lBit", AddressType::P2sh, true).is_err());
+        assert!(validate_prefix("3OBit", AddressType::P2sh, true, false).is_err());
+        assert!(validate_prefix("3lBit", AddressType::P2sh, true, false).is_err());
     }
 
     #[test]
     fn test_validate_segwit_prefix() {
-        assert!(validate_prefix("bc1qbit", AddressType::Segwit, true).is_ok());
-        assert!(validate_prefix("bc1qabc", AddressType::Segwit, true).is_ok());
-        // uppercase not allowed in bech32
-        assert!(validate_prefix("bc1Qbit", AddressType::Segwit, true).is_err());
-        // wrong prefix
-        assert!(validate_prefix("1Bit", AddressType::Segwit, true).is_err());
+        assert!(validate_prefix("bc1qbit", AddressType::Segwit, true, false).is_ok());
+        assert!(validate_prefix("bc1qabc", AddressType::Segwit, true, false).is_ok());
+        // Without case_insensitive, uppercase in Bech32 body is rejected
+        assert!(validate_prefix("bc1Qbit", AddressType::Segwit, true, false).is_err());
+        // With case_insensitive, uppercase is accepted (will be lowercased)
+        assert!(validate_prefix("vanity", AddressType::Segwit, true, false).is_ok());
+        assert!(validate_prefix("Vanity", AddressType::Segwit, true, true).is_ok());
+        // Non-Bech32 characters should still fail
+        assert!(validate_prefix("bc1qbit!", AddressType::Segwit, true, false).is_err());
+        assert!(validate_prefix("bc1q bit", AddressType::Segwit, true, false).is_err());
     }
 
     #[test]
     fn test_validate_taproot_prefix() {
-        assert!(validate_prefix("bc1pbit", AddressType::Taproot, true).is_ok());
-        assert!(validate_prefix("1Bit", AddressType::Taproot, true).is_err());
+        assert!(validate_prefix("bc1pbit", AddressType::Taproot, true, false).is_ok());
+        // Without case_insensitive, "1Bit" contains uppercase → rejected
+        assert!(validate_prefix("1Bit", AddressType::Taproot, true, false).is_err());
+        // With case_insensitive, uppercase is accepted
+        assert!(validate_prefix("1Bit", AddressType::Taproot, true, true).is_ok());
+        // Non-Bech32 characters should still fail
+        assert!(validate_prefix("bc1pbit!", AddressType::Taproot, true, false).is_err());
+        assert!(validate_prefix("bc1p bit", AddressType::Taproot, true, false).is_err());
     }
 
     #[test]

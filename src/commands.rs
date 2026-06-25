@@ -166,7 +166,12 @@ pub struct SearchConfig<'a> {
 pub fn run_search(cfg: &config::Config, sc: SearchConfig) -> Result<(), Error> {
     // Validate the pattern for the chosen address type (only for Prefix mode).
     if sc.match_mode == MatchMode::Prefix {
-        if let Err(msg) = cli::validate_prefix(sc.pattern, sc.addr_type, sc.strip_prefix) {
+        if let Err(msg) = cli::validate_prefix(
+            sc.pattern,
+            sc.addr_type,
+            sc.strip_prefix,
+            sc.case_insensitive,
+        ) {
             return Err(Error::InvalidPrefix(msg));
         }
     }
