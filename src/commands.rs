@@ -315,8 +315,19 @@ pub fn run_search(cfg: &config::Config, sc: SearchConfig) -> Result<(), Error> {
     // ── Auto-save to ~/.config/vanitygen/results.txt ──────────────
     let results_dir = dirs_config_path().join("vanitygen");
     let auto_path = results_dir.join("results.txt");
-    if let Err(e) = auto_save_results(&auto_path, sc.pattern, &results, elapsed, sc.match_mode, &secp, sc.network) {
-        log::info(&format!("Failed to save results to {}: {e}", auto_path.display()));
+    if let Err(e) = auto_save_results(
+        &auto_path,
+        sc.pattern,
+        &results,
+        elapsed,
+        sc.match_mode,
+        &secp,
+        sc.network,
+    ) {
+        log::info(&format!(
+            "Failed to save results to {}: {e}",
+            auto_path.display()
+        ));
     }
 
     // ── Write to output file if requested ──────────────────────────
@@ -553,7 +564,10 @@ fn auto_save_results(
     // Ensure directory exists.
     if let Some(parent) = path.parent() {
         create_dir_all(parent).map_err(|e| {
-            Error::Other(format!("Cannot create results directory '{}': {e}", parent.display()))
+            Error::Other(format!(
+                "Cannot create results directory '{}': {e}",
+                parent.display()
+            ))
         })?;
     }
 
@@ -561,12 +575,20 @@ fn auto_save_results(
         .create(true)
         .append(true)
         .open(path)
-        .map_err(|e| Error::Other(format!("Cannot open results file '{}': {e}", path.display())))?;
+        .map_err(|e| {
+            Error::Other(format!(
+                "Cannot open results file '{}': {e}",
+                path.display()
+            ))
+        })?;
 
-    let timestamp = format!("{}", std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0));
+    let timestamp = format!(
+        "{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    );
 
     for found in results {
         writeln!(file, "---")?;

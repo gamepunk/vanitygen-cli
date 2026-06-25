@@ -57,9 +57,13 @@ fn addr_type_prefix(addr_type: AddressType) -> &'static str {
 }
 
 /// Strip the address-type prefix from `addr` if it matches.
-fn strip_addr_prefix<'a>(addr: &'a str, addr_type: AddressType) -> &'a str {
+fn strip_addr_prefix(addr: &str, addr_type: AddressType) -> &str {
     let pfx = addr_type_prefix(addr_type);
-    if let Some(rest) = addr.strip_prefix(pfx) { rest } else { addr }
+    if let Some(rest) = addr.strip_prefix(pfx) {
+        rest
+    } else {
+        addr
+    }
 }
 
 // ── Matching helper ─────────────────────────────────────────────────────
@@ -497,49 +501,155 @@ mod tests {
 
     #[test]
     fn test_is_match_prefix() {
-        assert!(is_match("1ABCDef", "1ABC", MatchMode::Prefix, false, None));
-        assert!(!is_match("1ABCDef", "1XYZ", MatchMode::Prefix, false, None));
+        assert!(is_match(
+            "1ABCDef",
+            "1ABC",
+            MatchMode::Prefix,
+            false,
+            None,
+            None,
+            false
+        ));
+        assert!(!is_match(
+            "1ABCDef",
+            "1XYZ",
+            MatchMode::Prefix,
+            false,
+            None,
+            None,
+            false
+        ));
     }
 
     #[test]
     fn test_is_match_prefix_case_insensitive() {
         // Pattern must already be lowercased when case_insensitive=true
         // (the search() function pre-computes cmp_pat this way).
-        assert!(is_match("1ABCDef", "1abc", MatchMode::Prefix, true, None));
-        assert!(is_match("1ABCDef", "1abcd", MatchMode::Prefix, true, None));
-        assert!(!is_match("1ABCDef", "1xyz", MatchMode::Prefix, true, None));
+        assert!(is_match(
+            "1ABCDef",
+            "1abc",
+            MatchMode::Prefix,
+            true,
+            None,
+            None,
+            false
+        ));
+        assert!(is_match(
+            "1ABCDef",
+            "1abcd",
+            MatchMode::Prefix,
+            true,
+            None,
+            None,
+            false
+        ));
+        assert!(!is_match(
+            "1ABCDef",
+            "1xyz",
+            MatchMode::Prefix,
+            true,
+            None,
+            None,
+            false
+        ));
     }
 
     #[test]
     fn test_is_match_suffix() {
-        assert!(is_match("1ABCDef", "Def", MatchMode::Suffix, false, None));
-        assert!(!is_match("1ABCDef", "abc", MatchMode::Suffix, false, None));
+        assert!(is_match(
+            "1ABCDef",
+            "Def",
+            MatchMode::Suffix,
+            false,
+            None,
+            None,
+            false
+        ));
+        assert!(!is_match(
+            "1ABCDef",
+            "abc",
+            MatchMode::Suffix,
+            false,
+            None,
+            None,
+            false
+        ));
     }
 
     #[test]
     fn test_is_match_suffix_case_insensitive() {
-        assert!(is_match("1ABCDef", "def", MatchMode::Suffix, true, None));
+        assert!(is_match(
+            "1ABCDef",
+            "def",
+            MatchMode::Suffix,
+            true,
+            None,
+            None,
+            false
+        ));
     }
 
     #[test]
     fn test_is_match_anywhere() {
-        assert!(is_match("1ABCDef", "BCD", MatchMode::Anywhere, false, None));
-        assert!(is_match("1ABCDef", "1AB", MatchMode::Anywhere, false, None));
-        assert!(is_match("1ABCDef", "Def", MatchMode::Anywhere, false, None));
+        assert!(is_match(
+            "1ABCDef",
+            "BCD",
+            MatchMode::Anywhere,
+            false,
+            None,
+            None,
+            false
+        ));
+        assert!(is_match(
+            "1ABCDef",
+            "1AB",
+            MatchMode::Anywhere,
+            false,
+            None,
+            None,
+            false
+        ));
+        assert!(is_match(
+            "1ABCDef",
+            "Def",
+            MatchMode::Anywhere,
+            false,
+            None,
+            None,
+            false
+        ));
         assert!(!is_match(
             "1ABCDef",
             "XYZ",
             MatchMode::Anywhere,
             false,
-            None
+            None,
+            None,
+            false
         ));
     }
 
     #[test]
     fn test_is_match_regex() {
         let re = Regex::new("^1[A-Z]{3}").unwrap();
-        assert!(is_match("1ABCDef", "", MatchMode::Regex, false, Some(&re)));
-        assert!(!is_match("1abcDef", "", MatchMode::Regex, false, Some(&re)));
+        assert!(is_match(
+            "1ABCDef",
+            "",
+            MatchMode::Regex,
+            false,
+            Some(&re),
+            None,
+            false
+        ));
+        assert!(!is_match(
+            "1abcDef",
+            "",
+            MatchMode::Regex,
+            false,
+            Some(&re),
+            None,
+            false
+        ));
 
         let re2 = Regex::new("pizza$").unwrap();
         assert!(is_match(
@@ -547,14 +657,18 @@ mod tests {
             "",
             MatchMode::Regex,
             false,
-            Some(&re2)
+            Some(&re2),
+            None,
+            false
         ));
         assert!(!is_match(
             "bc1qpizzz",
             "",
             MatchMode::Regex,
             false,
-            Some(&re2)
+            Some(&re2),
+            None,
+            false
         ));
     }
 
@@ -562,7 +676,23 @@ mod tests {
     fn test_is_match_regex_with_case_insensitive() {
         // case_insensitive should have no effect on regex mode
         let re = Regex::new("^1[A-Z]{3}").unwrap();
-        assert!(is_match("1ABCxyz", "", MatchMode::Regex, true, Some(&re)));
-        assert!(!is_match("1abcxyz", "", MatchMode::Regex, true, Some(&re)));
+        assert!(is_match(
+            "1ABCxyz",
+            "",
+            MatchMode::Regex,
+            true,
+            Some(&re),
+            None,
+            false
+        ));
+        assert!(!is_match(
+            "1abcxyz",
+            "",
+            MatchMode::Regex,
+            true,
+            Some(&re),
+            None,
+            false
+        ));
     }
 }

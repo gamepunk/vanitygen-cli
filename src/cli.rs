@@ -225,7 +225,11 @@ impl AddressType {
 /// When `strip_prefix` is `true` (default), the function first strips the
 /// address-type prefix from the user pattern before validating the remaining
 /// characters.  This allows users to search for "Bit" instead of "1Bit".
-pub fn validate_prefix(prefix: &str, addr_type: AddressType, strip_prefix: bool) -> Result<(), String> {
+pub fn validate_prefix(
+    prefix: &str,
+    addr_type: AddressType,
+    strip_prefix: bool,
+) -> Result<(), String> {
     let hint = addr_type.prefix_hint();
 
     // When stripping is enabled, the user's pattern does NOT need to start
@@ -338,36 +342,42 @@ mod tests {
 
     #[test]
     fn test_validate_legacy_prefix() {
-        assert!(validate_prefix("1Bit", AddressType::Legacy).is_ok());
-        assert!(validate_prefix("1Love", AddressType::Legacy).is_ok());
-        // wrong first char
-        assert!(validate_prefix("2Bit", AddressType::Legacy).is_err());
-        assert!(validate_prefix("3Bit", AddressType::Legacy).is_err());
+        assert!(validate_prefix("1Bit", AddressType::Legacy, true).is_ok());
+        assert!(validate_prefix("1Love", AddressType::Legacy, true).is_ok());
+        // With strip_prefix=true, "2Bit" doesn't start with "1", used as-is,
+        // and is valid Base58 → OK
+        assert!(validate_prefix("2Bit", AddressType::Legacy, true).is_ok());
+        assert!(validate_prefix("3Bit", AddressType::Legacy, true).is_ok());
+        // But invalid Base58 chars should still fail
+        assert!(validate_prefix("1OBit", AddressType::Legacy, true).is_err());
+        assert!(validate_prefix("1lBit", AddressType::Legacy, true).is_err());
     }
 
     #[test]
     fn test_validate_p2sh_prefix() {
-        assert!(validate_prefix("3Bit", AddressType::P2sh).is_ok());
-        // lowercase second char → should error
-        assert!(validate_prefix("3qBit", AddressType::P2sh).is_err());
-        // uppercase second char → OK
-        assert!(validate_prefix("3QBit", AddressType::P2sh).is_ok());
+        assert!(validate_prefix("3Bit", AddressType::P2sh, true).is_ok());
+        // With strip_prefix=true, "3qBit" strips "3" → "qBit" (valid Base58)
+        assert!(validate_prefix("3qBit", AddressType::P2sh, true).is_ok());
+        assert!(validate_prefix("3QBit", AddressType::P2sh, true).is_ok());
+        // Invalid Base58 chars should still fail
+        assert!(validate_prefix("3OBit", AddressType::P2sh, true).is_err());
+        assert!(validate_prefix("3lBit", AddressType::P2sh, true).is_err());
     }
 
     #[test]
     fn test_validate_segwit_prefix() {
-        assert!(validate_prefix("bc1qbit", AddressType::Segwit).is_ok());
-        assert!(validate_prefix("bc1qabc", AddressType::Segwit).is_ok());
+        assert!(validate_prefix("bc1qbit", AddressType::Segwit, true).is_ok());
+        assert!(validate_prefix("bc1qabc", AddressType::Segwit, true).is_ok());
         // uppercase not allowed in bech32
-        assert!(validate_prefix("bc1Qbit", AddressType::Segwit).is_err());
+        assert!(validate_prefix("bc1Qbit", AddressType::Segwit, true).is_err());
         // wrong prefix
-        assert!(validate_prefix("1Bit", AddressType::Segwit).is_err());
+        assert!(validate_prefix("1Bit", AddressType::Segwit, true).is_err());
     }
 
     #[test]
     fn test_validate_taproot_prefix() {
-        assert!(validate_prefix("bc1pbit", AddressType::Taproot).is_ok());
-        assert!(validate_prefix("1Bit", AddressType::Taproot).is_err());
+        assert!(validate_prefix("bc1pbit", AddressType::Taproot, true).is_ok());
+        assert!(validate_prefix("1Bit", AddressType::Taproot, true).is_err());
     }
 
     #[test]
